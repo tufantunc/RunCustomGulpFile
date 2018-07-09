@@ -1,0 +1,17 @@
+﻿# Road map
+
+- [ ] Test on Visual Studio for Mac
+
+Features that have a checkmark are complete and available in extension.
+
+
+# Change log
+
+These are the changes to each version that has been released
+on the official Visual Studio extension gallery.
+
+## 1.0
+
+**2018-07-09**
+
+- [x] Extension published

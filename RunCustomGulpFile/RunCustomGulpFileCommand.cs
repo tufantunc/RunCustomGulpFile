@@ -10,6 +10,8 @@ using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Task = System.Threading.Tasks.Task;
+using Newtonsoft.Json;
+using System.Runtime.InteropServices;
 
 namespace RunCustomGulpFile
 {
@@ -88,6 +90,15 @@ namespace RunCustomGulpFile
         }
 
         /// <summary>
+        /// Assets config file class
+        /// </summary>
+        public class AssetsConfigFile
+        {
+            public string CustomAssetDirPath { get; set; }
+            public string GulpParameters { get; set; }
+        }
+
+        /// <summary>
         /// This function is the callback used to execute the command when the menu item is clicked.
         /// See the constructor to see how the menu item is associated with this function using
         /// OleMenuCommandService service and MenuCommand class.
@@ -98,38 +109,44 @@ namespace RunCustomGulpFile
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            string solutionPath = null;
+            string solutionPath = Path.GetDirectoryName(_dte.Solution.FullName);
+            string assetsDir = String.Empty;
+            string gulpParameters = String.Empty;
 
-            try
-            {
-                solutionPath = Path.GetDirectoryName(_dte.Solution.FullName);
-            }
-            catch
-            {
-                VsShellUtilities.ShowMessageBox(
-                    this.package,
-                    "You should open a solution.",
-                    "Run Custom GulpFile",
-                    OLEMSGICON.OLEMSGICON_INFO,
-                    OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                    OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
-                return;
-            }
+            string configFilePath = Path.Combine(solutionPath, "assetsconfig.json");
 
-            Array subDirectories = Directory.GetDirectories(solutionPath);
-            string assetsDir = null;
-            Regex reg = new Regex(@"([a-z]|[A-Z]).*\/?(Assets)");
-
-            foreach (string dir in subDirectories)
+            if (File.Exists(configFilePath))
             {
-                if (reg.Match(dir).Success)
+                AssetsConfigFile jsonData = new AssetsConfigFile();
+
+                using (StreamReader r = new StreamReader(configFilePath))
                 {
-                    assetsDir = dir;
-                    break;
+                    string json = r.ReadToEnd();
+                    jsonData = JsonConvert.DeserializeObject<AssetsConfigFile>(json);
+                }
+
+                if (jsonData.CustomAssetDirPath != null)
+                {
+                    assetsDir = Path.Combine(solutionPath, jsonData.CustomAssetDirPath);
+                    gulpParameters = jsonData.GulpParameters;
                 }
             }
+            else {
+                Array subDirectories = Directory.GetDirectories(solutionPath);
+                Regex reg = new Regex(@"([a-z]|[A-Z]).*\/?(Assets)");
 
-            if (assetsDir == null)
+                foreach (string dir in subDirectories)
+                {
+                    if (reg.Match(dir).Success)
+                    {
+                        assetsDir = dir;
+                        break;
+                    }
+                }
+            }
+            
+
+            if (String.IsNullOrEmpty(assetsDir))
             {
                 VsShellUtilities.ShowMessageBox(
                     this.package,
@@ -156,8 +173,18 @@ namespace RunCustomGulpFile
             }
 
             System.Diagnostics.Process proc = new System.Diagnostics.Process();
-            proc.StartInfo.FileName = "cmd.exe";
-            proc.StartInfo.Arguments = "/C gulp --gulpfile " + customGulpFilePath;
+            proc.StartInfo.WorkingDirectory = assetsDir;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                proc.StartInfo.FileName = "CMD.exe";
+                proc.StartInfo.Arguments = "/C gulp " + gulpParameters;
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                proc.StartInfo.FileName = "/bin/bash";
+                proc.StartInfo.Arguments = "-c gulp " + gulpParameters;
+            }
 
             proc.Start();
         }
