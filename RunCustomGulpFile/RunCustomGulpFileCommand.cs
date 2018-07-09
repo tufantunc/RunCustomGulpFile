@@ -178,7 +178,7 @@ namespace RunCustomGulpFile
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 proc.StartInfo.FileName = "CMD.exe";
-                proc.StartInfo.Arguments = "/C gulp " + gulpParameters;
+                proc.StartInfo.Arguments = "/K gulp " + gulpParameters;
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
